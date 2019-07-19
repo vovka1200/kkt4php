@@ -1,2 +1,2 @@
 # kkt4php
-PHP driver for Shtrih-M
+PHP драйвер для ККТ Штрих-М
