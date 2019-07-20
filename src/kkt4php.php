@@ -37,7 +37,6 @@ class KKT {
     private $socket;
     private $host;
     private $port;
-    private $password;
 
     static public function debug($data) {
         if (KKT::$DEBUG) {
@@ -46,10 +45,9 @@ class KKT {
         }
     }
 
-    function __construct($host, $port, $password) {
+    function __construct($host, $port) {
         $this->host = $host;
         $this->port = $port;
-        $this->password = $password;
         $this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
         if (!$this->socket) {
             throw new errors\SocketError();
