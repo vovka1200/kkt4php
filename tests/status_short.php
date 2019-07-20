@@ -20,13 +20,13 @@
 require_once realpath(__DIR__ . "/../") . '/src/kkt4php.php';
 
 use kkt4php\KKT,
-    kkt4php\commands\StatusShort;
+    kkt4php\commands\GetShortECRStatus;
 
 KKT::$DEBUG = true;
 
 $t = new KKT("127.0.0.1", 7778, "2");
 $t->connect();
-$c = new StatusShort(2);
+$c = new GetShortECRStatus(2);
 $t->send($c);
 var_export($c->data);
 

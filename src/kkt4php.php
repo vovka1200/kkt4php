@@ -260,7 +260,7 @@ abstract class Command {
     abstract function parse($buf);
 }
 
-class StatusShort extends Command {
+class GetShortECRStatus extends Command {
 
     static $CODE = "10";
     static public $LAST_PRINT = [
@@ -327,13 +327,13 @@ class StatusShort extends Command {
         $this->data = [
             "Код ошибки" => KKT::ERRORS[$data["E"]],
             "Порядковый номер кассира" => $data["N"],
-            "Флаги" => StatusShort::flags($data["F"]),
+            "Флаги" => GetShortECRStatus::flags($data["F"]),
             "Режим" => KKT::$MODE[$data["M"]],
             "Подрежим" => KKT::$SUBMODE[$data["MM"]],
             "Количество операций в чеке" => 256 * $data["Ca"] + $data["Cb"],
             "Напряжение резервной батареи" => round($data["V1"] / 51, 2),
             "Напряжение источника питания" => round($data["V2"] / 9, 2),
-            "Результат последней печати" => StatusShort::$LAST_PRINT[$data["R"]]
+            "Результат последней печати" => GetShortECRStatus::$LAST_PRINT[$data["R"]]
         ];
     }
 
