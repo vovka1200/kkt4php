@@ -24,9 +24,9 @@ use kkt4php\KKT,
 
 KKT::$DEBUG = true;
 
-$t = new KKT("127.0.0.1", 7778, "2");
+$t = new KKT("127.0.0.1", 7778);
 $t->connect();
 $c = new GetShortECRStatus(2);
 $t->send($c);
-var_export($c->data);
+var_export($c->getData());
 

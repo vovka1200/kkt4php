@@ -38,6 +38,10 @@ class KKT {
     private $host;
     private $port;
 
+    /**
+     * Вывод отладочной информации
+     * @param mixed $data
+     */
     static public function debug($data) {
         if (KKT::$DEBUG) {
             $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
@@ -45,6 +49,12 @@ class KKT {
         }
     }
 
+    /**
+     * Создаёт экземпляр драйвера
+     * @param string $host IP-адрес ККМ
+     * @param int $port Порт соединения 
+     * @throws errors\SocketError
+     */
     function __construct($host, $port) {
         $this->host = $host;
         $this->port = $port;
@@ -55,6 +65,11 @@ class KKT {
         KKT::debug("Создан socket = {$this->socket}");
     }
 
+    /**
+     * Подключение к ККМ
+     * @return boolean
+     * @throws errors\SocketError
+     */
     function connect() {
         if (socket_connect($this->socket, $this->host, $this->port)) {
             $this->setTimeout();
@@ -82,6 +97,12 @@ class KKT {
         return $buf;
     }
 
+    /**
+     * Установка ограничение времен ожидания
+     * @param type $milis
+     * @return type
+     * @throws errors\SocketError
+     */
     function setTimeout($milis = null) {
         $ms = $milis ?? KKT::$TIMEOUT_BYTE;
         $timeout = socket_set_option($this->socket, SOL_SOCKET, SO_RCVTIMEO, [
@@ -123,6 +144,12 @@ class KKT {
         return $this->readByte();
     }
 
+    /**
+     * Посылает данную команду на ККМ
+     * @param \kkt4php\commands\Command $command
+     * @return type
+     * @throws errors\KKTLRC
+     */
     function send(commands\Command $command) {
         switch ($this->confirm(pack("c", KKT::ENQ))) {
             case KKT::ACK :
@@ -179,12 +206,28 @@ abstract class Command {
 
     static $CODE = "00";
     private $password;
-    public $data;
+    protected $data;
 
+    /**
+     * Создаёт команду
+     * @param string $password Пароль администратора или кассира
+     */
     function __construct($password) {
         $this->password = $password;
     }
 
+    /**
+     * Возвращает данные результата команды
+     * @return array
+     */
+    function getData() {
+        return $this->data;
+    }
+
+    /**
+     * Упаковывает запрос
+     * @return string Бинарная строка
+     */
     function pack() {
         $len = 5;
         $buf = pack("cHV", $len, static::$CODE, $this->password);
@@ -193,7 +236,7 @@ abstract class Command {
 
     /**
      * Распаковка данных результата из буфера
-     * @param string $buf 
+     * @param string $buf Бинарная строка
      */
     abstract function parse($buf);
 }
@@ -289,6 +332,11 @@ class GetShortECRStatus extends Command {
         0b1000000000000000 => "Увеличенная точность количества"
     ];
 
+    /**
+     * Интерпретирует поле флагов
+     * @param short int $data Беззнаковое целое 2 байта
+     * @return string
+     */
     static public function flags($data) {
         $f = [];
         foreach (self::$FLAGS as $b => $title) {
@@ -299,6 +347,10 @@ class GetShortECRStatus extends Command {
         return $f;
     }
 
+    /**
+     * Распаковка данных результата из буфера
+     * @param string $buf Бинарная строка
+     */
     public function parse($buf) {
         if (strlen($buf) == 16) {
             $data = unpack("C/CE/CN/vF/CM/CMM/CCa/CV1/CV2/C/C/CCb/C/C/CR", $buf);
