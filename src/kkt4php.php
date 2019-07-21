@@ -37,6 +37,8 @@ class KKT {
     private $socket;
     private $host;
     private $port;
+    private $password;
+    private $connected = false;
 
     /**
      * Вывод отладочной информации
@@ -53,11 +55,13 @@ class KKT {
      * Создаёт экземпляр драйвера
      * @param string $host IP-адрес ККМ
      * @param int $port Порт соединения 
+     * @param int $password Пароль для последующих команд 
      * @throws errors\SocketError
      */
-    function __construct($host, $port) {
+    function __construct($host, int $port, int $password = null) {
         $this->host = $host;
         $this->port = $port;
+        $this->password = $password;
         $this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
         if (!$this->socket) {
             throw new errors\SocketError();
@@ -67,13 +71,14 @@ class KKT {
 
     /**
      * Подключение к ККМ
-     * @return boolean
+     * @return kkt4php\KKT
      * @throws errors\SocketError
      */
     function connect() {
         if (socket_connect($this->socket, $this->host, $this->port)) {
             $this->setTimeout();
-            return true;
+            $this->connected = true;
+            return $this;
         } else {
             throw new errors\SocketError();
         }
@@ -147,10 +152,14 @@ class KKT {
     /**
      * Посылает данную команду на ККМ
      * @param \kkt4php\commands\Command $command
-     * @return type
-     * @throws errors\KKTLRC
+     * @return \kkt4php\KKT
+     * @throws kkt4php\errors\WrongLRC
      */
     function send(commands\Command $command) {
+        if (!$this->connected) {
+            $this->connect();
+        }
+        $command->setPassword($this->password);
         switch ($this->confirm(pack("c", KKT::ENQ))) {
             case KKT::ACK :
                 KKT::debug("ACK");
@@ -170,9 +179,9 @@ class KKT {
                                     KKT::debug("LRC");
                                     $this->writeByte(KKT::ACK);
                                     $command->parse($buf);
-                                    return $buf;
+                                    return $this;
                                 } else {
-                                    throw new errors\KKTLRC();
+                                    throw new errors\WrongLRC();
                                 }
                             }
                         }
@@ -196,6 +205,28 @@ class KKT {
         return $checksum;
     }
 
+    /**
+     * Посылка команды
+     * @param string $name
+     * @param array $arguments
+     * @return mixed
+     */
+    public function __call(string $name, array $arguments) {
+        $command_class = "kkt4php\\commands\\{$name}";
+        KKT::debug($command_class);
+        if (class_exists($command_class)) {
+            return $this->send(new $command_class(...$arguments))->getData();
+        }
+    }
+
+    /**
+     * Устанавливает пароль для последющих команд
+     * @param int $password
+     */
+    function setPassword(int $password) {
+        $this->password = $password;
+    }
+
 }
 
 namespace kkt4php\commands;
@@ -205,6 +236,7 @@ use kkt4php\KKT;
 abstract class Command {
 
     static $CODE = "00";
+    private $init_password;
     private $password;
     protected $data;
 
@@ -212,8 +244,19 @@ abstract class Command {
      * Создаёт команду
      * @param string $password Пароль администратора или кассира
      */
-    function __construct($password) {
+    function __construct(int $password = null) {
         $this->password = $password;
+        $this->init_password = $password != null;
+    }
+
+    /**
+     * Устанавливает пароль, если он не был установлен во время создания команды
+     * @param int $password
+     */
+    function setPassword(int $password) {
+        if ($password != null && !$this->init_password) {
+            $this->password = $password;
+        }
     }
 
     /**
@@ -375,7 +418,11 @@ class GetShortECRStatus extends Command {
 
 namespace kkt4php\errors;
 
-class SocketError extends \Error {
+class KKTError extends \Error {
+    
+}
+
+class SocketError extends KKTError {
 
     function __construct() {
         parent::__construct(socket_strerror(socket_last_error()));
@@ -383,6 +430,10 @@ class SocketError extends \Error {
 
 }
 
-class KKTLRC extends \Error {
+class WrongLRC extends KKTError {
+    
+}
+
+class NoPassword extends KKTError {
     
 }
