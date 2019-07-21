@@ -26,7 +26,7 @@ namespace kkt4php;
  */
 class KKT {
 
-    static $DEBUG = false;
+    static $DEBUG        = false;
     static $TIMEOUT_BYTE = 50; // ms
 
     const STX = 0x02;
@@ -98,10 +98,10 @@ class KKT {
      * @throws errors\SocketError
      */
     function __construct($host, int $port, int $password = null) {
-        $this->host = $host;
-        $this->port = $port;
+        $this->host     = $host;
+        $this->port     = $port;
         $this->password = $password;
-        $this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+        $this->socket   = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
         if (!$this->socket) {
             throw new errors\SocketError();
         }
@@ -148,7 +148,7 @@ class KKT {
      * @throws errors\SocketError
      */
     function setTimeout($milis = null) {
-        $ms = $milis ?? KKT::$TIMEOUT_BYTE;
+        $ms      = $milis ?? KKT::$TIMEOUT_BYTE;
         $timeout = socket_set_option($this->socket, SOL_SOCKET, SO_RCVTIMEO, [
             "sec" => intval($ms % 1000),
             "usec" => ($ms - 1000 * intdiv($ms, 1000)) * 1000
@@ -164,8 +164,8 @@ class KKT {
      * @return type
      */
     private function readByte() {
-        $buf = $this->read(1);
-        $bytes = unpack("c", $buf);
+        $buf   = $this->read(1);
+        $bytes = unpack("C", $buf);
         return $bytes[1];
     }
 
@@ -175,7 +175,7 @@ class KKT {
      * @return type
      */
     private function writeByte($byte) {
-        return $this->write(pack("c", $byte));
+        return $this->write(pack("C", $byte));
     }
 
     /**
@@ -199,22 +199,22 @@ class KKT {
             $this->connect();
         }
         $command->setPassword($this->password);
-        switch ($this->confirm(pack("c", KKT::ENQ))) {
+        switch ($this->confirm(pack("C", KKT::ENQ))) {
             case KKT::ACK :
                 KKT::debug("ACK");
                 break;
             case KKT::NAK :
                 for ($i = 0; $i < 10; $i++) {
-                    $c = $this->confirm(pack("c", KKT::STX) . $command->pack());
+                    $c = $this->confirm(pack("C", KKT::STX) . $command->pack());
                     if ($c == KKT::ACK) {
                         KKT::debug("ACK");
                         for ($j = 0; $j < 10; $j++) {
                             if ($this->readByte() == KKT::STX) {
                                 KKT::debug("STX");
-                                $len = $this->readByte();
-                                $buf = $this->read($len);
+                                $len      = $this->readByte();
+                                $buf      = $this->read($len);
                                 $checksum = $this->readByte();
-                                if ($checksum == KKT::xor(pack("c", $len) . $buf)) {
+                                if ($checksum == KKT::xor(pack("C", $len) . $buf)) {
                                     KKT::debug("LRC");
                                     $this->writeByte(KKT::ACK);
                                     $command->parse($buf);
@@ -286,7 +286,7 @@ abstract class Command {
      * @param string $password Пароль администратора или кассира
      */
     function __construct(int $password = null) {
-        $this->password = $password;
+        $this->password      = $password;
         $this->init_password = $password != null;
     }
 
@@ -312,9 +312,9 @@ abstract class Command {
      * Упаковывает запрос
      * @return string Бинарная строка
      */
-    function pack() {
-        $len = 5;
-        $buf = pack("cHV", $len, static::$CODE, $this->password);
+    function pack($data = "") {
+        $len = strlen($data) + 5;
+        $buf = pack("CHV", $len, static::$CODE, $this->password) . $data;
         return $buf . pack("c", \kkt4php\KKT::xor($buf));
     }
 
@@ -323,6 +323,16 @@ abstract class Command {
      * @param string $buf Бинарная строка
      */
     abstract function parse($buf);
+
+    /**
+     * Упаковка целого значения в 5 байт
+     * @param int $value
+     * @return string
+     */
+    protected function packInteger5(int $value) {
+        return substr(pack("P", $value), 5);
+    }
+
 }
 
 /**
@@ -330,8 +340,8 @@ abstract class Command {
  */
 class GetShortECRStatus extends Command {
 
-    static $CODE = "10";
-    static public $MODE = [
+    static $CODE              = "10";
+    static public $MODE       = [
         1 => "Выдача данных",
         2 => "Открытая смена, 24 часа не кончились",
         3 => "Открытая смена, 24 часа кончились",
@@ -345,7 +355,7 @@ class GetShortECRStatus extends Command {
         0b01001000 => "Возврат расхода",
         0b10001000 => "Нефискальный",
     ];
-    static public $SUBMODE = [
+    static public $SUBMODE    = [
         0 => "Бумага есть",
         1 => "Пассивное отсутствие бумаги",
         2 => "Активное отсутствие бумаги",
@@ -359,7 +369,7 @@ class GetShortECRStatus extends Command {
         2 => "Ошибка принтера",
         5 => "Идет печать"
     ];
-    static public $FLAGS = [
+    static public $FLAGS      = [
         0b0000000000000001 => "Рулон операционного журнала",
         0b0000000000000010 => "Рулон чековой ленты",
         0b0000000000000100 => "Верхний датчик подкладного документа",
@@ -412,6 +422,75 @@ class GetShortECRStatus extends Command {
             "Напряжение резервной батареи" => round($data["V1"] / 51, 2),
             "Напряжение источника питания" => round($data["V2"] / 9, 2),
             "Результат последней печати" => self::$LAST_PRINT[$data["result"]]
+        ];
+    }
+
+}
+
+/**
+ * Команда прихода
+ */
+class Sale extends Command {
+
+    static $CODE = "80";
+    protected $quantity;
+    protected $price;
+    protected $department;
+    protected $tax1;
+    protected $tax2;
+    protected $tax3;
+    protected $tax4;
+    protected $texts;
+
+    /**
+     * Команда производит регистрацию продажи определенного количества 
+     * товара в определенную секцию с вычислением налогов без закрытия чека.
+     * @param int $quantity Количество
+     * @param int $price Цена
+     * @param int $department Отдел
+     * @param int $tax1 Налоговая группа 1
+     * @param int $tax2 Налоговая группа 1
+     * @param int $tax3 Налоговая группа 1
+     * @param int $tax4 Налоговая группа 1
+     * @param string $texts Строка названия товара
+     * @param string $password Пароль
+     */
+    function __construct($quantity, $price, $department, $tax1, $tax2, $tax3, $tax4, $texts, $password = null) {
+        parent::__construct($password);
+        $this->quantity   = $quantity;
+        $this->price      = $price;
+        $this->department = $department;
+        $this->tax1       = $tax1;
+        $this->tax2       = $tax2;
+        $this->tax3       = $tax3;
+        $this->tax4       = $tax4;
+        $this->texts      = $texts;
+    }
+
+    /**
+     * Упаковывает запрос
+     * @return string Бинарная строка
+     */
+    function pack() {
+        parent::pack(
+                $this->packInteger5($this->quantity) .
+                $this->packInteger5($this->price) .
+                pack("C*",
+                        $this->department,
+                        $this->tax1,
+                        $this->tax2,
+                        $this->tax3,
+                        $this->tax4,
+                        $this->text
+                )
+        );
+    }
+
+    public function parse($buf) {
+        $data       = unpack("C/Cerror/Cnumber", $buf);
+        $this->data = [
+            "Код ошибки" => KKT::ERRORS[$data["error"]],
+            "Порядковый номер кассира" => $data["number"],
         ];
     }
 
