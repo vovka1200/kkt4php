@@ -23,7 +23,8 @@ use kkt4php\KKT;
 
 KKT::$DEBUG = true;
 
-$t        = new KKT("127.0.0.1", 7778, 2);
+$t = new KKT("127.0.0.1", 7778, 2);
+
 $response = $t->GetShortECRStatus();
 var_export($response);
 

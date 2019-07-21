@@ -325,12 +325,33 @@ abstract class Command {
     abstract function parse($buf);
 
     /**
+     * Распаковка данных обычного результата из буфера
+     * @param string $buf
+     */
+    public function parseSimple($buf) {
+        $data       = unpack("C/Cerror/Cnumber", $buf);
+        $this->data = [
+            "Код ошибки" => KKT::ERRORS[$data["error"]],
+            "Порядковый номер кассира" => $data["number"],
+        ];
+    }
+
+    /**
      * Упаковка целого значения в 5 байт
      * @param int $value
      * @return string
      */
     protected function packInteger5(int $value) {
         return substr(pack("P", $value), 5);
+    }
+
+    /**
+     * Упаковка целого 16 bit со знаком
+     * @param int $value
+     * @return string
+     */
+    protected function packSignedShort(int $value) {
+        return pack("v", $value) | ($value < 0) ? 0b1000000000000000 : 0;
     }
 
 }
@@ -440,7 +461,7 @@ class Sale extends Command {
     protected $tax2;
     protected $tax3;
     protected $tax4;
-    protected $texts;
+    protected $text;
 
     /**
      * Команда производит регистрацию продажи определенного количества 
@@ -452,10 +473,10 @@ class Sale extends Command {
      * @param int $tax2 Налоговая группа 1
      * @param int $tax3 Налоговая группа 1
      * @param int $tax4 Налоговая группа 1
-     * @param string $texts Строка названия товара
+     * @param string $text Строка названия товара
      * @param string $password Пароль
      */
-    function __construct($quantity, $price, $department, $tax1, $tax2, $tax3, $tax4, $texts, $password = null) {
+    function __construct($quantity, $price, $department, $tax1, $tax2, $tax3, $tax4, $text, $password = null) {
         parent::__construct($password);
         $this->quantity   = $quantity;
         $this->price      = $price;
@@ -464,7 +485,7 @@ class Sale extends Command {
         $this->tax2       = $tax2;
         $this->tax3       = $tax3;
         $this->tax4       = $tax4;
-        $this->texts      = $texts;
+        $this->text       = $text;
     }
 
     /**
@@ -475,7 +496,7 @@ class Sale extends Command {
         parent::pack(
                 $this->packInteger5($this->quantity) .
                 $this->packInteger5($this->price) .
-                pack("C*",
+                pack("CCCCCA",
                         $this->department,
                         $this->tax1,
                         $this->tax2,
@@ -487,11 +508,79 @@ class Sale extends Command {
     }
 
     public function parse($buf) {
-        $data       = unpack("C/Cerror/Cnumber", $buf);
-        $this->data = [
-            "Код ошибки" => KKT::ERRORS[$data["error"]],
-            "Порядковый номер кассира" => $data["number"],
-        ];
+        $this->parseSimple($buf);
+    }
+
+}
+
+/**
+ * Команда закрытия чека
+ */
+class CloseCheck extends Command {
+
+    static $CODE = "85";
+    protected $summ1;
+    protected $summ2;
+    protected $summ3;
+    protected $summ4;
+    protected $discount;
+    protected $tax1;
+    protected $tax2;
+    protected $tax3;
+    protected $tax4;
+    protected $text;
+
+    /**
+     * Команда закрытия чека. Метод производит закрытие чека комбинированным 
+     * типом оплаты с вычислением налогов и суммы сдачи.
+     * @param int $summ1
+     * @param int $summ2
+     * @param int $summ3
+     * @param int $summ4
+     * @param float $discount Скидка/Надбавка в процентах
+     * @param int $tax1 Налоговая группа 1
+     * @param int $tax2 Налоговая группа 1
+     * @param int $tax3 Налоговая группа 1
+     * @param int $tax4 Налоговая группа 1
+     * @param string $text Строка названия товара
+     * @param string $password Пароль
+     */
+    function __construct($summ1, $summ2, $summ3, $summ4, $discount, $tax1, $tax2, $tax3, $tax4, $text, $password = null) {
+        $this->summ1    = $summ1;
+        $this->summ2    = $summ2;
+        $this->summ3    = $summ3;
+        $this->summ4    = $summ4;
+        $this->discount = intval($discount * 100);
+        $this->tax1     = $tax1;
+        $this->tax2     = $tax2;
+        $this->tax3     = $tax3;
+        $this->tax4     = $tax4;
+        $this->text     = $text;
+    }
+
+    /**
+     * Упаковывает запрос
+     * @return string Бинарная строка
+     */
+    function pack() {
+        parent::pack(
+                $this->packInteger5($this->sum1) .
+                $this->packInteger5($this->sum2) .
+                $this->packInteger5($this->sum3) .
+                $this->packInteger5($this->sum4) .
+                $this->packSignedShort($this->discount) .
+                pack("CCCCA",
+                        $this->tax1,
+                        $this->tax2,
+                        $this->tax3,
+                        $this->tax4,
+                        $this->text
+                )
+        );
+    }
+
+    public function parse($buf) {
+        $this->parseSimple($buf);
     }
 
 }
