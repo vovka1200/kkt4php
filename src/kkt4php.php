@@ -585,6 +585,15 @@ class CloseCheck extends Command {
 
 }
 
+/**
+ * Команда отмены (аннулирования) чека
+ */
+class CancelCheck extends Command {
+
+    static $CODE = "88";
+
+}
+
 namespace kkt4php\errors;
 
 class KKTError extends \Error {
