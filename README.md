@@ -7,5 +7,8 @@ PHP драйвер для ККТ Штрих-М
 
 ### Реализованные методы драйвера
 
+- CancelCheck
+- CloseCheck
+- CutCheck
 - GetShortECRStatus
 - Sale
