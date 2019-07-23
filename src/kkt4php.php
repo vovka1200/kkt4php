@@ -76,7 +76,9 @@ class KKT {
         58 => "Переполнение накопления по надбавкам в смене",
         59 => "Переполнение накопления в смене",
         60 => "Смена открыта – операция невозможна",
-        61 => "Смена не открыта – операция невозможна"
+        61 => "Смена не открыта – операция невозможна",
+        115 => "Операция невозможна в открытом чеке данного типа",
+        126 => "Неверное значение в поле длины"
     ];
 
     /**
@@ -128,7 +130,7 @@ class KKT {
         if ($bytes === false) {
             throw new errors\SocketError();
         }
-        KKT::debug(implode(" ", unpack("H*", $buf)));
+        KKT::debug("[$bytes]" . implode(" ", unpack("H*", $buf)));
         return $bytes;
     }
 
@@ -137,7 +139,7 @@ class KKT {
         if ($buf === false) {
             throw new errors\SocketError();
         }
-        KKT::debug(implode(" ", unpack("H*", $buf)));
+        KKT::debug("[$len]" . implode(" ", unpack("H*", $buf)));
         return $buf;
     }
 
@@ -199,34 +201,40 @@ class KKT {
             $this->connect();
         }
         $command->setPassword($this->password);
-        switch ($this->confirm(pack("C", KKT::ENQ))) {
-            case KKT::ACK :
-                KKT::debug("ACK");
-                break;
-            case KKT::NAK :
-                for ($i = 0; $i < 10; $i++) {
-                    $c = $this->confirm(pack("C", KKT::STX) . $command->pack());
-                    if ($c == KKT::ACK) {
-                        KKT::debug("ACK");
-                        for ($j = 0; $j < 10; $j++) {
-                            if ($this->readByte() == KKT::STX) {
-                                KKT::debug("STX");
-                                $len      = $this->readByte();
-                                $buf      = $this->read($len);
-                                $checksum = $this->readByte();
-                                if ($checksum == KKT::xor(pack("C", $len) . $buf)) {
-                                    KKT::debug("LRC");
-                                    $this->writeByte(KKT::ACK);
-                                    $command->parse($buf);
-                                    return $this;
-                                } else {
-                                    throw new errors\WrongLRC();
+        for ($k = 0; $k < 10; $k++) {
+            switch ($this->confirm(pack("C", KKT::ENQ))) {
+                case KKT::ACK :
+                    KKT::debug("ACK");
+                    break;
+                case KKT::NAK :
+                    for ($i = 0; $i < 10; $i++) {
+                        $c = $this->confirm(pack("C", KKT::STX) . $command->pack());
+                        if ($c == KKT::ACK) {
+                            KKT::debug("получен ACK");
+                            for ($j = 0; $j < 10; $j++) {
+                                if ($this->readByte() == KKT::STX) {
+                                    KKT::debug("получен STX");
+                                    $len      = $this->readByte();
+                                    KKT::debug("получена длина $len");
+                                    $buf      = $this->read($len);
+                                    $checksum = $this->readByte();
+                                    if ($checksum == KKT::xor(pack("C", $len) . $buf)) {
+                                        KKT::debug("получен верный LRC");
+                                        $this->writeByte(KKT::ACK);
+                                        $command->parse($buf);
+                                        if ($command->getData()["Код ошибки"] > 0) {
+                                            throw new errors\KKTError($command->getData()["Ошибка"], $command->getData()["Код ошибки"]);
+                                        }
+                                        return $this;
+                                    } else {
+                                        throw new errors\WrongLRC();
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                break;
+                    break;
+            }
         }
     }
 
@@ -310,12 +318,14 @@ abstract class Command {
 
     /**
      * Упаковывает запрос
+     * @param type $data
      * @return string Бинарная строка
      */
     function pack($data = "") {
-        $len = strlen($data) + 5;
-        $buf = pack("CHV", $len, static::$CODE, $this->password) . $data;
-        return $buf . pack("c", \kkt4php\KKT::xor($buf));
+        $len   = strlen($data) + 5;
+        $buf   = pack("CCV", $len, static::$CODE, $this->password) . $data;
+        $bytes = $buf . pack("c", \kkt4php\KKT::xor($buf));
+        return $bytes;
     }
 
     /**
@@ -329,20 +339,30 @@ abstract class Command {
      * @param string $buf
      */
     public function parseSimple($buf) {
-        $data       = unpack("C/Cerror/Cnumber", $buf);
-        $this->data = [
-            "Код ошибки" => KKT::ERRORS[$data["error"]],
-            "Порядковый номер кассира" => $data["number"],
-        ];
+        if (strlen($buf) == 3) {
+            $data       = unpack("C/Cerror/Cnumber", $buf);
+            $this->data = [
+                "Код ошибки" => $data["error"],
+                "Ошибка" => KKT::ERRORS[$data["error"]],
+                "Порядковый номер кассира" => $data["number"],
+            ];
+        } else {
+            $data       = unpack("C/Cerror", $buf);
+            $this->data = [
+                "Код ошибки" => $data["error"],
+                "Ошибка" => KKT::ERRORS[$data["error"]],
+                "Порядковый номер кассира" => "нет данных",
+            ];
+        }
     }
 
     /**
      * Упаковка целого значения в 5 байт
-     * @param int $value
+     * @param long64 $value
      * @return string
      */
-    protected function packInteger5(int $value) {
-        return substr(pack("P", $value), 5);
+    protected function packInteger5($value) {
+        return pack("V", $value) . pack("c", 0);
     }
 
     /**
@@ -361,7 +381,7 @@ abstract class Command {
  */
 class GetShortECRStatus extends Command {
 
-    static $CODE              = "10";
+    static $CODE              = 0x10;
     static public $MODE       = [
         1 => "Выдача данных",
         2 => "Открытая смена, 24 часа не кончились",
@@ -434,7 +454,8 @@ class GetShortECRStatus extends Command {
         }
         KKT::debug($data);
         $this->data = [
-            "Код ошибки" => KKT::ERRORS[$data["error"]],
+            "Код ошибки" => $data["error"],
+            "Ошибка" => KKT::ERRORS[$data["error"]],
             "Порядковый номер кассира" => $data["number"],
             "Флаги" => GetShortECRStatus::flags($data["flags"]),
             "Режим" => self::$MODE[$data["mode"]],
@@ -453,7 +474,7 @@ class GetShortECRStatus extends Command {
  */
 class Sale extends Command {
 
-    static $CODE = "80";
+    static $CODE = 0x80;
     protected $quantity;
     protected $price;
     protected $department;
@@ -490,25 +511,26 @@ class Sale extends Command {
 
     /**
      * Упаковывает запрос
+     * @param type $data
      * @return string Бинарная строка
      */
-    function pack() {
-        parent::pack(
-                $this->packInteger5($this->quantity) .
-                $this->packInteger5($this->price) .
-                pack("CCCCCA",
-                        $this->department,
-                        $this->tax1,
-                        $this->tax2,
-                        $this->tax3,
-                        $this->tax4,
-                        $this->text
-                )
+    function pack($data = "") {
+        return parent::pack(
+                        $this->packInteger5($this->quantity) .
+                        $this->packInteger5($this->price) .
+                        pack("CCCCCA*",
+                                $this->department,
+                                $this->tax1,
+                                $this->tax2,
+                                $this->tax3,
+                                $this->tax4,
+                                str_pad($this->text, max(strlen($this->text), 40))
+                        )
         );
     }
 
-    public function parse($buf) {
-        $this->parseSimple($buf);
+    public function parse($data = "") {
+        $this->parseSimple($data);
     }
 
 }
@@ -518,7 +540,7 @@ class Sale extends Command {
  */
 class CloseCheck extends Command {
 
-    static $CODE = "85";
+    static $CODE = 0x85;
     protected $summ1;
     protected $summ2;
     protected $summ3;
@@ -560,27 +582,28 @@ class CloseCheck extends Command {
 
     /**
      * Упаковывает запрос
+     * @param type $data
      * @return string Бинарная строка
      */
-    function pack() {
-        parent::pack(
-                $this->packInteger5($this->sum1) .
-                $this->packInteger5($this->sum2) .
-                $this->packInteger5($this->sum3) .
-                $this->packInteger5($this->sum4) .
-                $this->packSignedShort($this->discount) .
-                pack("CCCCA",
-                        $this->tax1,
-                        $this->tax2,
-                        $this->tax3,
-                        $this->tax4,
-                        $this->text
-                )
+    function pack($data = "") {
+        return parent::pack(
+                        $this->packInteger5($this->sum1) .
+                        $this->packInteger5($this->sum2) .
+                        $this->packInteger5($this->sum3) .
+                        $this->packInteger5($this->sum4) .
+                        $this->packSignedShort($this->discount) .
+                        pack("CCCCA",
+                                $this->tax1,
+                                $this->tax2,
+                                $this->tax3,
+                                $this->tax4,
+                                $this->text
+                        )
         );
     }
 
-    public function parse($buf) {
-        $this->parseSimple($buf);
+    public function parse($data = "") {
+        $this->parseSimple($data);
     }
 
 }
@@ -590,7 +613,11 @@ class CloseCheck extends Command {
  */
 class CancelCheck extends Command {
 
-    static $CODE = "88";
+    static $CODE = 0x88;
+
+    public function parse($data = "") {
+        $this->parseSimple($data);
+    }
 
 }
 
