@@ -621,6 +621,26 @@ class CancelCheck extends Command {
 
 }
 
+class CutCheck extends Command {
+
+    static $CODE = 0x25;
+    protected $type;
+
+    function __construct($type = 0, int $password = null) {
+        parent::__construct($password);
+        $this->type = $type;
+    }
+
+    public function pack($data = ""): string {
+        return parent::pack(pack("C", $this->type));
+    }
+
+    public function parse($data = "") {
+        $this->parseSimple($data);
+    }
+
+}
+
 namespace kkt4php\errors;
 
 class KKTError extends \Error {
