@@ -166,8 +166,7 @@ class KKT {
 
     /**
      * Установка ограничение времен ожидания
-     * @param type $milis
-     * @return type
+     * @param type $milis 
      * @throws errors\SocketError
      */
     function setTimeout($milis = null) {
@@ -182,8 +181,7 @@ class KKT {
         if (socket_set_option($this->socket, SOL_SOCKET, SO_SNDTIMEO, $time) === false) {
             throw new errors\SocketError();
         }
-        KKT::debug($time);
-        return $timeout;
+        KKT::debug("{$time["sec"]} cек, {$time["usec"]} мкс");
     }
 
     /**
@@ -256,6 +254,7 @@ class KKT {
                         }
                     }
                     break;
+                default : $this->readByte();
             }
         }
         $this->disconnect();
@@ -535,17 +534,17 @@ class Sale extends Command {
      */
     function pack($data = "") {
         return parent::pack(
-                        //pack("H*", "E80300000064000000000100000000C1F3EBEAE00000000000000000000000000000000000000000000000000000000000000000000000")
-                        $this->packInteger5($this->quantity) .
-                        $this->packInteger5($this->price) .
-                        pack("CCCCCa*",
-                                $this->department,
-                                $this->tax1,
-                                $this->tax2,
-                                $this->tax3,
-                                $this->tax4,
-                                str_pad($this->text, max(strlen($this->text), 40, "\0"))
-                        )
+                        pack("H*", "E80300000064000000000100000000C1F3EBEAE00000000000000000000000000000000000000000000000000000000000000000000000")
+                        /*  $this->packInteger5($this->quantity) .
+                          $this->packInteger5($this->price) .
+                          pack("CCCCCa*",
+                          $this->department,
+                          $this->tax1,
+                          $this->tax2,
+                          $this->tax3,
+                          $this->tax4,
+                          str_pad($this->text, max(strlen($this->text), 40, "\0"))
+                          ) */
         );
     }
 
@@ -668,16 +667,21 @@ class OpenCheck extends Command {
 
 class FeedDocument extends Command {
 
-    static $CODE              = 0x8D;
-    static $FLAG_JOURNAL      = 0x00;
-    static $FLAG_RECEIPT      = 0x01;
-    static $FLAG_SLIPDOCUMENT = 0x02;
+    static $CODE              = 0x29;
+    static $FLAG_JOURNAL      = 0x01;
+    static $FLAG_RECEIPT      = 0x02;
+    static $FLAG_SLIPDOCUMENT = 0x04;
     protected $flags;
     protected $lines;
 
-    function __construct($lines = 0, $flags = 0, int $password = null) {
+    function __construct($lines = 1, $flags = 3, int $password = null) {
         parent::__construct($password);
+        $this->lines = $lines;
         $this->flags = $flags;
+    }
+
+    public function pack($data = ""): string {
+        return parent::pack(pack("CC", $this->flags, $this->lines));
     }
 
 }

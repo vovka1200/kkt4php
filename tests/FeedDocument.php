@@ -25,4 +25,5 @@ use kkt4php\KKT;
 KKT::$DEBUG = true;
 
 $t        = new KKT(HOST, PORT, PASSWORD);
-$response = $t->FeedDocument(10);
+$response = $t->FeedDocument(3);
+var_export($response);
