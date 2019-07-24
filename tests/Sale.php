@@ -25,6 +25,9 @@ KKT::$DEBUG = true;
 
 $t = new KKT("127.0.0.1", 7778, 2);
 
+$response = $t->OpenCheck(kkt4php\commands\OpenCheck::$TYPE_BUY);
+var_export($response);
+
 $response = $t->Sale(1, 1, 1, 0, 0, 0, 0, "test");
 var_export($response);
 

@@ -641,6 +641,29 @@ class CutCheck extends Command {
 
 }
 
+class OpenCheck extends Command {
+
+    static $CODE             = 0x8D;
+    static $TYPE_SALE        = 0;
+    static $TYPE_BUY         = 1;
+    static $TYPE_CANCEL_SALE = 2;
+    static $TYPE_CANCEL_BUY  = 3;
+
+    function __construct($type = 0, int $password = null) {
+        parent::__construct($password);
+        $this->type = $type;
+    }
+
+    public function pack($data = ""): string {
+        return parent::pack(pack("C", $this->type));
+    }
+
+    public function parse($data = "") {
+        $this->parseSimple($data);
+    }
+
+}
+
 namespace kkt4php\errors;
 
 class KKTError extends \Error {
