@@ -18,12 +18,13 @@
  */
 
 require_once realpath(__DIR__ . "/../") . '/src/kkt4php.php';
+require_once 'config.php';
 
 use kkt4php\KKT;
 
 KKT::$DEBUG = true;
 
-$t        = new KKT("127.0.0.1", 7778, 30);
+$t        = new KKT(HOST, PORT, PASSWORD);
 $response = $t->CutCheck(1);
 var_export($response);
 

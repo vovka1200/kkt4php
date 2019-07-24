@@ -27,7 +27,7 @@ namespace kkt4php;
 class KKT {
 
     static $DEBUG        = false;
-    static $TIMEOUT_BYTE = 50; // ms
+    static $TIMEOUT_BYTE = 3000; // ms
 
     const STX = 0x02;
     const ENQ = 0x05;
@@ -77,6 +77,8 @@ class KKT {
         59 => "Переполнение накопления в смене",
         60 => "Смена открыта – операция невозможна",
         61 => "Смена не открыта – операция невозможна",
+        89 => "Документ открыт другим кассиром",
+        94 => "Неверная операция",
         115 => "Операция невозможна в открытом чеке данного типа",
         126 => "Неверное значение в поле длины"
     ];
@@ -108,6 +110,14 @@ class KKT {
             throw new errors\SocketError();
         }
         KKT::debug("Создан socket = {$this->socket}");
+        $this->setTimeout();
+    }
+
+    /**
+     * 
+     */
+    function __destruct() {
+        $this->disconnect();
     }
 
     /**
@@ -116,21 +126,32 @@ class KKT {
      * @throws errors\SocketError
      */
     function connect() {
-        if (socket_connect($this->socket, $this->host, $this->port)) {
-            $this->setTimeout();
-            $this->connected = true;
+        if ($this->connected = socket_connect($this->socket, $this->host, $this->port)) {
             return $this;
         } else {
             throw new errors\SocketError();
         }
     }
 
+    /**
+     * Завершение соединения
+     */
+    function disconnect() {
+        if ($this->socket) {
+            KKT::debug("{$this->socket}");
+            socket_set_option($this->socket, SOL_SOCKET, SO_LINGER, ["l_linger" => 0, "l_onoff" => 1]);
+            socket_close($this->socket);
+            $this->socket = null;
+        }
+    }
+
     private function write($buf, $len = null) {
+        KKT::debug(implode(" ", unpack("H*", $buf)));
         $bytes = socket_write($this->socket, $buf, $len ?? strlen($buf));
         if ($bytes === false) {
             throw new errors\SocketError();
         }
-        KKT::debug("[$bytes]" . implode(" ", unpack("H*", $buf)));
+        KKT::debug("[$bytes]");
         return $bytes;
     }
 
@@ -150,14 +171,18 @@ class KKT {
      * @throws errors\SocketError
      */
     function setTimeout($milis = null) {
-        $ms      = $milis ?? KKT::$TIMEOUT_BYTE;
-        $timeout = socket_set_option($this->socket, SOL_SOCKET, SO_RCVTIMEO, [
-            "sec" => intval($ms % 1000),
+        $ms   = $milis ?? KKT::$TIMEOUT_BYTE;
+        $time = [
+            "sec" => intdiv($ms, 1000),
             "usec" => ($ms - 1000 * intdiv($ms, 1000)) * 1000
-        ]);
-        if ($timeout === false) {
+        ];
+        if (socket_set_option($this->socket, SOL_SOCKET, SO_RCVTIMEO, $time) === false) {
             throw new errors\SocketError();
         }
+        if (socket_set_option($this->socket, SOL_SOCKET, SO_SNDTIMEO, $time) === false) {
+            throw new errors\SocketError();
+        }
+        KKT::debug($time);
         return $timeout;
     }
 
@@ -222,9 +247,6 @@ class KKT {
                                         KKT::debug("получен верный LRC");
                                         $this->writeByte(KKT::ACK);
                                         $command->parse($buf);
-                                        if ($command->getData()["Код ошибки"] > 0) {
-                                            throw new errors\KKTError($command->getData()["Ошибка"], $command->getData()["Код ошибки"]);
-                                        }
                                         return $this;
                                     } else {
                                         throw new errors\WrongLRC();
@@ -236,6 +258,7 @@ class KKT {
                     break;
             }
         }
+        $this->disconnect();
     }
 
     /**
@@ -280,7 +303,8 @@ class KKT {
 
 namespace kkt4php\commands;
 
-use kkt4php\KKT;
+use kkt4php\KKT,
+    kkt4php\errors\KKTError;
 
 abstract class Command {
 
@@ -329,30 +353,26 @@ abstract class Command {
     }
 
     /**
-     * Распаковка данных результата из буфера
-     * @param string $buf Бинарная строка
-     */
-    abstract function parse($buf);
-
-    /**
      * Распаковка данных обычного результата из буфера
      * @param string $buf
      */
-    public function parseSimple($buf) {
-        if (strlen($buf) == 3) {
-            $data       = unpack("C/Cerror/Cnumber", $buf);
-            $this->data = [
-                "Код ошибки" => $data["error"],
-                "Ошибка" => KKT::ERRORS[$data["error"]],
-                "Порядковый номер кассира" => $data["number"],
-            ];
-        } else {
+    public function parse($buf) {
+        if (strlen($buf) == 2) {
             $data       = unpack("C/Cerror", $buf);
             $this->data = [
                 "Код ошибки" => $data["error"],
                 "Ошибка" => KKT::ERRORS[$data["error"]],
                 "Порядковый номер кассира" => "нет данных",
             ];
+            throw new KKTError($this->data["Ошибка"], $this->data["Код ошибки"]);
+        } else {
+            $data       = unpack("C/Cerror/Cnumber", $buf);
+            $this->data = [
+                "Код ошибки" => $data["error"],
+                "Ошибка" => KKT::ERRORS[$data["error"]],
+                "Порядковый номер кассира" => $data["number"],
+            ];
+            return substr($buf, 3);
         }
     }
 
@@ -447,16 +467,15 @@ class GetShortECRStatus extends Command {
      * @param string $buf Бинарная строка
      */
     public function parse($buf) {
-        if (strlen($buf) == 16) {
-            $data = unpack("C/Cerror/Cnumber/vflags/Cmode/Csubmode/Ccheck1/CV1/CV2/C/C/Ccheck2/C/C/Cresult", $buf);
+        $rest = parent::parse($buf);
+        KKT::debug(unpack("H*", $rest));
+        if (strlen($rest) == 13) {
+            $data = unpack("vflags/Cmode/Csubmode/Ccheck1/CV1/CV2/C/C/Ccheck2/C/C/Cresult", $rest);
         } else {
-            $data = unpack("C/Cerror/Cnumber/vflags/Cmode/Csubmode/Ccheck1/CV1/CV2/C/C/Ccheck2/C/C/C/Cresult", $buf);
+            $data = unpack("vflags/Cmode/Csubmode/Ccheck1/CV1/CV2/C/C/Ccheck2/C/C/C/Cresult", $rest);
         }
         KKT::debug($data);
-        $this->data = [
-            "Код ошибки" => $data["error"],
-            "Ошибка" => KKT::ERRORS[$data["error"]],
-            "Порядковый номер кассира" => $data["number"],
+        $this->data = array_merge($this->data, [
             "Флаги" => GetShortECRStatus::flags($data["flags"]),
             "Режим" => self::$MODE[$data["mode"]],
             "Подрежим" => self::$SUBMODE[$data["submode"]],
@@ -464,7 +483,7 @@ class GetShortECRStatus extends Command {
             "Напряжение резервной батареи" => round($data["V1"] / 51, 2),
             "Напряжение источника питания" => round($data["V2"] / 9, 2),
             "Результат последней печати" => self::$LAST_PRINT[$data["result"]]
-        ];
+        ]);
     }
 
 }
@@ -491,9 +510,9 @@ class Sale extends Command {
      * @param int $price Цена
      * @param int $department Отдел
      * @param int $tax1 Налоговая группа 1
-     * @param int $tax2 Налоговая группа 1
-     * @param int $tax3 Налоговая группа 1
-     * @param int $tax4 Налоговая группа 1
+     * @param int $tax2 Налоговая группа 2
+     * @param int $tax3 Налоговая группа 3
+     * @param int $tax4 Налоговая группа 4
      * @param string $text Строка названия товара
      * @param string $password Пароль
      */
@@ -516,21 +535,18 @@ class Sale extends Command {
      */
     function pack($data = "") {
         return parent::pack(
+                        //pack("H*", "E80300000064000000000100000000C1F3EBEAE00000000000000000000000000000000000000000000000000000000000000000000000")
                         $this->packInteger5($this->quantity) .
                         $this->packInteger5($this->price) .
-                        pack("CCCCCA*",
+                        pack("CCCCCa*",
                                 $this->department,
                                 $this->tax1,
                                 $this->tax2,
                                 $this->tax3,
                                 $this->tax4,
-                                str_pad($this->text, max(strlen($this->text), 40))
+                                str_pad($this->text, max(strlen($this->text), 40, "\0"))
                         )
         );
-    }
-
-    public function parse($data = "") {
-        $this->parseSimple($data);
     }
 
 }
@@ -592,7 +608,7 @@ class CloseCheck extends Command {
                         $this->packInteger5($this->sum3) .
                         $this->packInteger5($this->sum4) .
                         $this->packSignedShort($this->discount) .
-                        pack("CCCCA",
+                        pack("CCCCa*",
                                 $this->tax1,
                                 $this->tax2,
                                 $this->tax3,
@@ -600,10 +616,6 @@ class CloseCheck extends Command {
                                 $this->text
                         )
         );
-    }
-
-    public function parse($data = "") {
-        $this->parseSimple($data);
     }
 
 }
@@ -615,15 +627,13 @@ class CancelCheck extends Command {
 
     static $CODE = 0x88;
 
-    public function parse($data = "") {
-        $this->parseSimple($data);
-    }
-
 }
 
 class CutCheck extends Command {
 
-    static $CODE = 0x25;
+    static $CODE      = 0x25;
+    static $TYPE_FULL = 0;
+    static $TYPE_PART = 1;
     protected $type;
 
     function __construct($type = 0, int $password = null) {
@@ -633,10 +643,6 @@ class CutCheck extends Command {
 
     public function pack($data = ""): string {
         return parent::pack(pack("C", $this->type));
-    }
-
-    public function parse($data = "") {
-        $this->parseSimple($data);
     }
 
 }
@@ -658,8 +664,92 @@ class OpenCheck extends Command {
         return parent::pack(pack("C", $this->type));
     }
 
-    public function parse($data = "") {
-        $this->parseSimple($data);
+}
+
+class FeedDocument extends Command {
+
+    static $CODE              = 0x8D;
+    static $FLAG_JOURNAL      = 0x00;
+    static $FLAG_RECEIPT      = 0x01;
+    static $FLAG_SLIPDOCUMENT = 0x02;
+    protected $flags;
+    protected $lines;
+
+    function __construct($lines = 0, $flags = 0, int $password = null) {
+        parent::__construct($password);
+        $this->flags = $flags;
+    }
+
+}
+
+class Beep extends Command {
+
+    static $CODE = 0x13;
+
+}
+
+/**
+ * Метод передает команду «E0h», при этом в ФП открывается смена, а ККТ переходит в режим «Открытой смены»
+ */
+class OpenSession extends Command {
+
+    static $CODE = 0xE0;
+
+}
+
+class GetDeviceMetrics extends Command {
+
+    static $CODE      = 0xFC;
+    static $TYPES     = [
+        "ККМ",
+        "Весы",
+        "Фискальная память",
+        "КУ ТРК",
+        "MemoPlus",
+        "Чековый принтер",
+        "АСПД"
+    ];
+    static $LANGUAGES = [
+        "русский",
+        "английский",
+        "эстонский",
+        "казахский",
+        "белорусский",
+        "армянский",
+        "грузинский",
+        "украинский",
+        "киргизский",
+        "туркменский",
+        "молдавский"
+    ];
+
+    /**
+     * Упаковывает запрос
+     * @param type $data
+     * @return string Бинарная строка
+     */
+    function pack($data = "") {
+        $buf = pack("CC", 1, static::$CODE);
+        return $buf . pack("c", \kkt4php\KKT::xor($buf));
+    }
+
+    /**
+     * Распаковка данных результата из буфера
+     * @param string $buf Бинарная строка
+     */
+    public function parse($buf) {
+        $data       = unpack("C/Cerror/Ctype/Csubtype/Cversion/Crevision/Cmodel/Clanguage/A*text", $buf);
+        $this->data = [
+            "Код ошибки" => $data["error"],
+            "Ошибка" => KKT::ERRORS[$data["error"]],
+            "Тип устройства" => self::$TYPES [$data["type"]],
+            "Подтип устройства" => $data["subtype"],
+            "Версия протокола" => $data["version"],
+            "Подверсия протокола" => $data["revision"],
+            "Модель устройства" => $data["model"],
+            "Язык устройства" => self::$LANGUAGES[$data["language"]],
+            "Название устройства" => iconv("CP1251", "UTF-8", $data["text"])
+        ];
     }
 
 }
@@ -674,6 +764,7 @@ class SocketError extends KKTError {
 
     function __construct() {
         parent::__construct(socket_strerror(socket_last_error()));
+        socket_clear_error();
     }
 
 }

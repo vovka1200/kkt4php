@@ -24,19 +24,5 @@ use kkt4php\KKT;
 
 KKT::$DEBUG = true;
 
-$t = new KKT(HOST, PORT, PASSWORD);
-
-$response = $t->OpenCheck(kkt4php\commands\OpenCheck::$TYPE_BUY);
-var_export($response);
-
-$response = $t->Sale(1, 1, 1, 0, 0, 0, 0, "test");
-var_export($response);
-
+$t        = new KKT(HOST, PORT, PASSWORD);
 $response = $t->FeedDocument(10);
-var_export($response);
-
-$response = $t->CutCheck(\kkt4php\commands\CutCheck::$TYPE_PART);
-var_export($response);
-
-$response = $t->CloseCheck();
-var_export($response);

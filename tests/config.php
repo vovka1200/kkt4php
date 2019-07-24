@@ -17,26 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-require_once realpath(__DIR__ . "/../") . '/src/kkt4php.php';
-require_once 'config.php';
+define("HOST", "127.0.0.1");
+define("PORT", 7778);
+define("PASSWORD", 2);
 
-use kkt4php\KKT;
-
-KKT::$DEBUG = true;
-
-$t = new KKT(HOST, PORT, PASSWORD);
-
-$response = $t->OpenCheck(kkt4php\commands\OpenCheck::$TYPE_BUY);
-var_export($response);
-
-$response = $t->Sale(1, 1, 1, 0, 0, 0, 0, "test");
-var_export($response);
-
-$response = $t->FeedDocument(10);
-var_export($response);
-
-$response = $t->CutCheck(\kkt4php\commands\CutCheck::$TYPE_PART);
-var_export($response);
-
-$response = $t->CloseCheck();
-var_export($response);
