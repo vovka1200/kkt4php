@@ -20,7 +20,9 @@
 require_once realpath(__DIR__ . "/../") . '/src/kkt4php.php';
 require_once 'config.php';
 
-use kkt4php\KKT;
+use kkt4php\KKT,
+    kkt4php\errors\KKTError,
+    kkt4php\errors\Printing;
 
 KKT::$DEBUG = true;
 
@@ -28,15 +30,42 @@ $t = new KKT(HOST, PORT, PASSWORD);
 
 $response = $t->OpenCheck(kkt4php\commands\OpenCheck::$TYPE_SALE);
 var_export($response);
+try {
+    // Продажа
+    $response = $t->Sale(1000, 100, 1, 0, 0, 0, 0, "test Sale");
+    var_export($response);
+    // Закрытие чека
+    $response = $t->CloseCheck(100, 0, 0, 0, 0, 0, 0, 0, 0, "test Close");
+    var_export($response);
 
-$response = $t->Sale(1, 1, 1, 0, 0, 0, 0, "test");
-var_export($response);
 
-$response = $t->FeedDocument(3);
-var_export($response);
+    for ($i = 0; $i < 5; $i ++) {
+        try {
+            // Пауза для печати
+            sleep(1);
+            // Продвижение на 3 строки
+            $response = $t->FeedDocument(3);
+            break;
+        } catch (Printing $ex) {
+            echo "Идёт печать...";
+        }
+    }
 
-$response = $t->CutCheck(\kkt4php\commands\CutCheck::$TYPE_PART);
-var_export($response);
+    for ($i = 0; $i < 5; $i ++) {
+        try {
+            // Пауза для печати
+            sleep(1);
+            // Продвижение на 3 строки
+            $response = $t->CutCheck();
+            break;
+        } catch (Printing $ex) {
+            echo "Идёт печать...";
+        }
+    }
+} catch (KKTError $ex) {
+    // Отмена чека
+    echo $ex->getMessage() . "!\n";
+    $response = $t->CancelCheck();
+    var_export($response);
+}
 
-$response = $t->CancelCheck();
-var_export($response);

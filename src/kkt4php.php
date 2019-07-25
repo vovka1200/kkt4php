@@ -77,8 +77,11 @@ class KKT {
         59 => "Переполнение накопления в смене",
         60 => "Смена открыта – операция невозможна",
         61 => "Смена не открыта – операция невозможна",
+        64 => "Переполнение диапазона скидок",
+        80 => "Идет печать результатов выполнения предыдущей команды",
         89 => "Документ открыт другим кассиром",
         94 => "Неверная операция",
+        99 => "Переполнение диапазона отдела",
         115 => "Операция невозможна в открытом чеке данного типа",
         126 => "Неверное значение в поле длины"
     ];
@@ -146,7 +149,7 @@ class KKT {
     }
 
     private function write($buf, $len = null) {
-        KKT::debug(implode(" ", unpack("H*", $buf)));
+        KKT::debug(implode(" ", str_split(implode("", unpack("H*", $buf)), 2)));
         $bytes = socket_write($this->socket, $buf, $len ?? strlen($buf));
         if ($bytes === false) {
             throw new errors\SocketError();
@@ -160,7 +163,7 @@ class KKT {
         if ($buf === false) {
             throw new errors\SocketError();
         }
-        KKT::debug("[$len]" . implode(" ", unpack("H*", $buf)));
+        KKT::debug("[$len] " . implode(" ", str_split(implode("", unpack("H*", $buf)), 2)));
         return $buf;
     }
 
@@ -303,7 +306,8 @@ class KKT {
 namespace kkt4php\commands;
 
 use kkt4php\KKT,
-    kkt4php\errors\KKTError;
+    kkt4php\errors\KKTError,
+    kkt4php\errors\Printing;
 
 abstract class Command {
 
@@ -363,7 +367,10 @@ abstract class Command {
                 "Ошибка" => KKT::ERRORS[$data["error"]],
                 "Порядковый номер кассира" => "нет данных",
             ];
-            throw new KKTError($this->data["Ошибка"], $this->data["Код ошибки"]);
+            switch ($data["error"]) {
+                case 80: throw new Printing($this->data["Ошибка"], $this->data["Код ошибки"]);
+                default: throw new KKTError($this->data["Ошибка"], $this->data["Код ошибки"]);
+            }
         } else {
             $data       = unpack("C/Cerror/Cnumber", $buf);
             $this->data = [
@@ -390,7 +397,7 @@ abstract class Command {
      * @return string
      */
     protected function packSignedShort(int $value) {
-        return pack("v", $value) | ($value < 0) ? 0b1000000000000000 : 0;
+        return pack("v", $value + ($value < 0) ? 0b1000000000000000 : 0);
     }
 
 }
@@ -505,8 +512,8 @@ class Sale extends Command {
     /**
      * Команда производит регистрацию продажи определенного количества 
      * товара в определенную секцию с вычислением налогов без закрытия чека.
-     * @param int $quantity Количество
-     * @param int $price Цена
+     * @param int $quantity Количество грамм
+     * @param int $price Цена копейки
      * @param int $department Отдел
      * @param int $tax1 Налоговая группа 1
      * @param int $tax2 Налоговая группа 2
@@ -534,24 +541,23 @@ class Sale extends Command {
      */
     function pack($data = "") {
         return parent::pack(
-                        pack("H*", "E80300000064000000000100000000C1F3EBEAE00000000000000000000000000000000000000000000000000000000000000000000000")
-                        /*  $this->packInteger5($this->quantity) .
-                          $this->packInteger5($this->price) .
-                          pack("CCCCCa*",
-                          $this->department,
-                          $this->tax1,
-                          $this->tax2,
-                          $this->tax3,
-                          $this->tax4,
-                          str_pad($this->text, max(strlen($this->text), 40, "\0"))
-                          ) */
+                        $this->packInteger5($this->quantity) .
+                        $this->packInteger5($this->price) .
+                        pack("CCCCCa*",
+                                $this->department,
+                                $this->tax1,
+                                $this->tax2,
+                                $this->tax3,
+                                $this->tax4,
+                                str_pad($this->text, max(strlen($this->text), 40), "\0")
+                        )
         );
     }
 
 }
 
 /**
- * Команда закрытия чека
+ * Метод производит закрытие чека комбинированным типом оплаты с вычислением налогов и суммы сдачи
  */
 class CloseCheck extends Command {
 
@@ -570,10 +576,10 @@ class CloseCheck extends Command {
     /**
      * Команда закрытия чека. Метод производит закрытие чека комбинированным 
      * типом оплаты с вычислением налогов и суммы сдачи.
-     * @param int $summ1
-     * @param int $summ2
-     * @param int $summ3
-     * @param int $summ4
+     * @param int $summ1 копейки
+     * @param int $summ2 копейки
+     * @param int $summ3 копейки
+     * @param int $summ4 копейки
      * @param float $discount Скидка/Надбавка в процентах
      * @param int $tax1 Налоговая группа 1
      * @param int $tax2 Налоговая группа 1
@@ -587,7 +593,7 @@ class CloseCheck extends Command {
         $this->summ2    = $summ2;
         $this->summ3    = $summ3;
         $this->summ4    = $summ4;
-        $this->discount = intval($discount * 100);
+        $this->discount = round($discount * 100);
         $this->tax1     = $tax1;
         $this->tax2     = $tax2;
         $this->tax3     = $tax3;
@@ -602,19 +608,30 @@ class CloseCheck extends Command {
      */
     function pack($data = "") {
         return parent::pack(
-                        $this->packInteger5($this->sum1) .
-                        $this->packInteger5($this->sum2) .
-                        $this->packInteger5($this->sum3) .
-                        $this->packInteger5($this->sum4) .
+                        $this->packInteger5($this->summ1) .
+                        $this->packInteger5($this->summ2) .
+                        $this->packInteger5($this->summ3) .
+                        $this->packInteger5($this->summ4) .
                         $this->packSignedShort($this->discount) .
                         pack("CCCCa*",
                                 $this->tax1,
                                 $this->tax2,
                                 $this->tax3,
                                 $this->tax4,
-                                $this->text
+                                str_pad($this->text, max(strlen($this->text), 40), "\0")
                         )
         );
+    }
+
+    public function parse($buf) {
+        $rest       = parent::parse($buf);
+        KKT::debug(unpack("H*", $rest));
+        $data       = unpack("Cc1/Cc2/Cc3/Cc4/Cc5/A*site", $rest);
+        KKT::debug($data);
+        $this->data = array_merge($this->data, [
+            "Сдача" => $data["c1"] + $data["c2"] * 0x100 + $data["c3"] * 0x1000 + $data["c4"] * 0x10000 + $data["c5"] * 0x100000,
+            "Сайт" => $data["site"]
+        ]);
     }
 
 }
@@ -758,9 +775,22 @@ class GetDeviceMetrics extends Command {
 
 }
 
+/**
+ * Печатает сменный отчет с гашением
+ */
+class PrintReportWithCleaning extends Command {
+
+    static $CODE = 0x41;
+
+}
+
 namespace kkt4php\errors;
 
 class KKTError extends \Error {
+    
+}
+
+class Printing extends KKTError {
     
 }
 
