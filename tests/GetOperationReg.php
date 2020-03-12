@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Copyright (C) 2020 vovka
+ * Copyright (C) 2020 Vladimir Yavorskiy <vovka@krevedko.su>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Copyright (C) 2019 Vladimir Yavorskiy <vovka@krevedko.su>
+ * Copyright (C) 2020 Vladimir Yavorskiy <vovka@krevedko.su>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -301,6 +301,15 @@ class KKT {
         $this->password = $password;
     }
 
+    /**
+     * Преобразует текст в кодировку CP1251
+     * @param string $text
+     * @return string
+     */
+    static function text($text) {
+        return iconv("UTF-8", "CP1251", $text);
+    }
+
 }
 
 namespace kkt4php\commands;
@@ -441,6 +450,50 @@ class GetOperationReg extends Command {
             "Кассир" => $data["cacher"],
             "Содержимое" => $data["value"]
         ];
+    }
+
+}
+
+/**
+ * ПечатьСтрокиДаннымШрифтом
+ */
+class PrintStringWithFont extends Command {
+
+    static $CODE              = 0x2F;
+    static $FLAG_JOURNAL      = 0x01;
+    static $FLAG_RECEIPT      = 0x02;
+    static $FLAG_SLIPDOCUMENT = 0x04;
+    static $FLAG_SLIPCHECK    = 0x08;
+    static $FLAG_LINEFEED     = 0x10;
+    static $FLAG_DELAYED      = 0x20;
+    protected $text;
+    protected $flags;
+    protected $font;
+
+    /**
+     * Команда получает содержимое данного регистра     * 
+     * @param int $number Номер регистра
+     * @param int $password
+     */
+    function __construct($text, $font, $flags, int $password = null) {
+        parent::__construct($password);
+        $this->text  = $text;
+        $this->font  = $font;
+        $this->flags = $flags;
+    }
+
+    /**
+     * Упаковывает запрос
+     * @param type $data
+     * @return string Бинарная строка
+     */
+    public function pack($data = ""): string {
+        return parent::pack(pack("CCa*",
+                                $this->flags,
+                                $this->font,
+                                KKT::text($this->text)
+                        )
+        );
     }
 
 }
