@@ -403,6 +403,25 @@ abstract class Command {
 }
 
 /**
+ * ПолучитьОперационныйРегистр
+ */
+class GetOperationReg extends Command {
+
+    static $CODE = 0x1B;
+    protected $number;
+
+    function __construct($number, int $password = null) {
+        parent::__construct($password);
+        $this->number = $number;
+    }
+
+    public function pack($data = ""): string {
+        return parent::pack(pack("C", $this->number));
+    }
+
+}
+
+/**
  * ПолучитьКороткийЗапросСостоянияККМ
  */
 class GetShortECRStatus extends Command {
@@ -670,6 +689,7 @@ class OpenCheck extends Command {
     static $TYPE_BUY         = 1;
     static $TYPE_CANCEL_SALE = 2;
     static $TYPE_CANCEL_BUY  = 3;
+    protected $type;
 
     function __construct($type = 0, int $password = null) {
         parent::__construct($password);
