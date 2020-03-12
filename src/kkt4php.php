@@ -289,7 +289,7 @@ class KKT {
         if (class_exists($command_class)) {
             $command = new $command_class(...$arguments);
             $this->send($command);
-            return $command->getData();
+            return $command->get();
         }
     }
 
@@ -308,6 +308,84 @@ class KKT {
      */
     static function text($text) {
         return iconv("UTF-8", "CP1251", $text);
+    }
+
+}
+
+/**
+ * ГрафическоеИзображение
+ */
+class Image {
+
+    protected $image;
+
+    function __construct($file_path) {
+        $this->image = new \Imagick($file_path);
+    }
+
+    /**
+     * Возвращает объект данных строки изображения
+     * @param int $y
+     * @return type
+     */
+    function getLineData(int $y) {
+        $ld = new LineData($this);
+        $ld->load($y);
+        return $ld;
+    }
+
+    /**
+     * Возвращает ширину изображения
+     * @return type
+     */
+    function getWidth() {
+        return $this->image->getImageWidth();
+    }
+
+    /**
+     * Возвращает RGBA-вектор цвета пикселя
+     * @param type $x
+     * @param type $y
+     * @return array
+     */
+    function getPixelColor($x, $y): array {
+        return $this->image->getImagePixelColor($x, $y)->getColor();
+    }
+
+}
+
+/**
+ * ГрафическаяИнформация
+ */
+class LineData {
+
+    protected $data = "";
+    protected $image;
+
+    function __construct(Image $image) {
+        $this->image = $image;
+    }
+
+    /**
+     * Загружает строку изображения
+     * @param int $y
+     */
+    function load(int $y) {
+        $this->data = "";
+        $w          = $this->image->getWidth();
+        for ($x = 0; $x < $w; $x++) {
+            $rgba       = $this->image->getPixelColor($x, $y);
+            $this->data .= ~hex2bin(sprintf('%02x', ($rgba["r"] + $rgba["g"] + $rgba["b"]) / 3));
+        }
+        KKT::debug(bin2hex($this->data));
+    }
+
+    /**
+     * Возвращает бинарную строку 
+     * @return type
+     */
+    function get() {
+        return str_pad(substr($this->data, 0, 40), 40, "\0");
     }
 
 }
@@ -407,6 +485,45 @@ abstract class Command {
      */
     protected function packSignedShort(int $value) {
         return pack("v", $value + ($value < 0) ? 0b1000000000000000 : 0);
+    }
+
+}
+
+/**
+ * ЗагрузкаГрафики
+ */
+class LoadLineData extends Command {
+
+    static $CODE = 0xC0;
+
+    const MIN_NUMBER = 0;
+    const MAX_NUMBER = 199;
+
+    protected $number;
+    protected $line_data;
+
+    /**
+     * Команда записывает в ККМ графическую информацию в виде строки
+     * @param int $line_data Номер регистра
+     * @param int $password
+     */
+    function __construct($number, \kkt4php\LineData $line_data, int $password = null) {
+        parent::__construct($password);
+        $this->number    = max(min($number, self::MAX_NUMBER), self::MIN_NUMBER);
+        $this->line_data = $line_data->get();
+    }
+
+    /**
+     * Упаковывает запрос
+     * @param type $data
+     * @return string Бинарная строка
+     */
+    public function pack($data = ""): string {
+        return parent::pack(pack("CC*",
+                                $this->number,
+                                $this->line_data->get()
+                        )
+        );
     }
 
 }
