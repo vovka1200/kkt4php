@@ -410,13 +410,37 @@ class GetOperationReg extends Command {
     static $CODE = 0x1B;
     protected $number;
 
+    /**
+     * Команда получает содержимое данного регистра     * 
+     * @param int $number Номер регистра
+     * @param int $password
+     */
     function __construct($number, int $password = null) {
         parent::__construct($password);
         $this->number = $number;
     }
 
+    /**
+     * Упаковывает запрос
+     * @param type $data
+     * @return string Бинарная строка
+     */
     public function pack($data = ""): string {
         return parent::pack(pack("C", $this->number));
+    }
+
+    /**
+     * Распаковка данных результата из буфера
+     * @param string $buf Бинарная строка
+     */
+    public function parse($buf) {
+        $data       = unpack("C/Cerror/Ccacher/vvalue", $buf);
+        $this->data = [
+            "Код ошибки" => $data["error"],
+            "Ошибка" => KKT::ERRORS[$data["error"]],
+            "Кассир" => $data["cacher"],
+            "Содержимое" => $data["value"]
+        ];
     }
 
 }
