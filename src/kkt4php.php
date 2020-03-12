@@ -459,13 +459,16 @@ class GetOperationReg extends Command {
  */
 class PrintStringWithFont extends Command {
 
-    static $CODE              = 0x2F;
-    static $FLAG_JOURNAL      = 0x01;
-    static $FLAG_RECEIPT      = 0x02;
-    static $FLAG_SLIPDOCUMENT = 0x04;
-    static $FLAG_SLIPCHECK    = 0x08;
-    static $FLAG_LINEFEED     = 0x10;
-    static $FLAG_DELAYED      = 0x20;
+    static $CODE = 0x2F;
+
+    const FLAG_JOURNAL      = 0x01;
+    const FLAG_RECEIPT      = 0x02;
+    const FLAG_SLIPDOCUMENT = 0x04;
+    const FLAG_SLIPCHECK    = 0x08;
+    const FLAG_LINEFEED     = 0x10;
+    const FLAG_DELAYED      = 0x20;
+    const MAX_STRING        = 248;
+
     protected $text;
     protected $flags;
     protected $font;
@@ -475,7 +478,7 @@ class PrintStringWithFont extends Command {
      * @param int $number Номер регистра
      * @param int $password
      */
-    function __construct($text, $font, $flags, int $password = null) {
+    function __construct($text, $font, int $flags = self::FLAG_JOURNAL || self::FLAG_JOURNAL || self::FLAG_LINEFEED, int $password = null) {
         parent::__construct($password);
         $this->text  = $text;
         $this->font  = $font;
@@ -491,7 +494,7 @@ class PrintStringWithFont extends Command {
         return parent::pack(pack("CCa*",
                                 $this->flags,
                                 $this->font,
-                                KKT::text($this->text)
+                                KKT::text(substr($this->text, 0, self::MAX_STRING))
                         )
         );
     }
@@ -761,14 +764,16 @@ class CutCheck extends Command {
 
 class OpenCheck extends Command {
 
-    static $CODE             = 0x8D;
-    static $TYPE_SALE        = 0;
-    static $TYPE_BUY         = 1;
-    static $TYPE_CANCEL_SALE = 2;
-    static $TYPE_CANCEL_BUY  = 3;
+    static $CODE = 0x8D;
+
+    const TYPE_SALE        = 0;
+    const TYPE_BUY         = 1;
+    const TYPE_CANCEL_SALE = 2;
+    const TYPE_CANCEL_BUY  = 3;
+
     protected $type;
 
-    function __construct($type = 0, int $password = null) {
+    function __construct($type = self::TYPE_SALE, int $password = null) {
         parent::__construct($password);
         $this->type = $type;
     }
@@ -781,14 +786,16 @@ class OpenCheck extends Command {
 
 class FeedDocument extends Command {
 
-    static $CODE              = 0x29;
-    static $FLAG_JOURNAL      = 0x01;
-    static $FLAG_RECEIPT      = 0x02;
-    static $FLAG_SLIPDOCUMENT = 0x04;
+    static $CODE = 0x29;
+
+    const FLAG_JOURNAL      = 0x01;
+    const FLAG_RECEIPT      = 0x02;
+    const FLAG_SLIPDOCUMENT = 0x04;
+
     protected $flags;
     protected $lines;
 
-    function __construct($lines = 1, $flags = 3, int $password = null) {
+    function __construct($lines = 1, $flags = self::FLAG_JOURNAL || self::FLAG_RECEIPT, int $password = null) {
         parent::__construct($password);
         $this->lines = $lines;
         $this->flags = $flags;
