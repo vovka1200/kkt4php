@@ -9,6 +9,7 @@ PHP драйвер для ККТ Штрих-М
 
 - GetDeviceMetrics
 - GetShortECRStatus
+- GetOperationReg
 
 - OpenCheck
 - CloseCheck
