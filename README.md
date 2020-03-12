@@ -16,6 +16,7 @@ PHP драйвер для ККТ Штрих-М
 - CutCheck
 - Sale
 - PrintReportWithCleaning
+- PrintStringWithFont
 
 - FeedDocument
 
