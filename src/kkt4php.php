@@ -920,12 +920,14 @@ class CancelCheck extends Command {
 
 class CutCheck extends Command {
 
-    static $CODE      = 0x25;
-    static $TYPE_FULL = 0;
-    static $TYPE_PART = 1;
+    static $CODE = 0x25;
+
+    const TYPE_FULL = 0;
+    const TYPE_PART = 1;
+
     protected $type;
 
-    function __construct($type = 0, int $password = null) {
+    function __construct($type = self::TYPE_FULL, int $password = null) {
         parent::__construct($password);
         $this->type = $type;
     }
