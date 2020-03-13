@@ -26,6 +26,8 @@ namespace kkt4php;
  */
 class KKT {
 
+    const VERSION = "0.1.0";
+
     static $DEBUG        = false;
     static $TIMEOUT_BYTE = 3000; // ms
 
@@ -129,7 +131,8 @@ class KKT {
      * @throws errors\SocketError
      */
     function connect() {
-        if ($this->connected = socket_connect($this->socket, $this->host, $this->port)) {
+        $this->connected = socket_connect($this->socket, $this->host, $this->port);
+        if ($this->connected) {
             return $this;
         } else {
             throw new errors\SocketError();
