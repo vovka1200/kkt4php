@@ -24,3 +24,4 @@ PHP драйвер для ККТ Штрих-М
 - Beep
 
 - LoadLineData
+- LoadImage

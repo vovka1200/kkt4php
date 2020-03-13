@@ -310,6 +310,17 @@ class KKT {
         return iconv("UTF-8", "CP1251", $text);
     }
 
+    /**
+     * Загрузка изображения
+     * @param string $file_path
+     */
+    function LoadImage($file_path) {
+        $im = new Image($file_path);
+        for ($y = 0; $y < $im->getHeight(); $y++) {
+            $this->LoadLineData($y, $im->getLineData($y));
+        }
+    }
+
 }
 
 /**
@@ -336,10 +347,18 @@ class Image {
 
     /**
      * Возвращает ширину изображения
-     * @return type
+     * @return int
      */
     function getWidth() {
         return $this->image->getImageWidth();
+    }
+
+    /**
+     * Возвращает высоту изображения
+     * @return int
+     */
+    function getHeight() {
+        return $this->image->getImageHeight();
     }
 
     /**
