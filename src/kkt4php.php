@@ -512,6 +512,41 @@ abstract class Command {
 }
 
 /**
+ * ПечатьКартинки
+ */
+class Draw extends Command {
+
+    static $CODE = 0xC1;
+    protected $first_line;
+    protected $last_line;
+
+    /**
+     * Команда печатает графику
+     * @param int $first_line
+     * @param int $last_line
+     */
+    function __construct(int $first_line, int$last_line, int $password = null) {
+        parent::__construct($password);
+        $this->first_line = $first_line;
+        $this->last_line  = $last_line;
+    }
+
+    /**
+     * Упаковывает запрос
+     * @param type $data
+     * @return string Бинарная строка
+     */
+    public function pack($data = ""): string {
+        return parent::pack(pack("CC",
+                                $this->first_line,
+                                $this->last_line
+                        )
+        );
+    }
+
+}
+
+/**
  * ЗагрузкаГрафики
  */
 class LoadLineData extends Command {

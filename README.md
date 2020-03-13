@@ -25,3 +25,4 @@ PHP драйвер для ККТ Штрих-М
 
 - LoadLineData
 - LoadImage
+- Draw
