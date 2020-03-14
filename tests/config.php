@@ -16,8 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+require_once realpath(__DIR__ . "/../") . '/src/kkt4php.php';
 
-define("HOST", "127.0.0.1");
+kkt4php\KKT::$DEBUG = true;
+
+define("HOST", "192.168.0.66");
 define("PORT", 7778);
 define("PASSWORD", 2);
 

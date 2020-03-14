@@ -978,7 +978,12 @@ class FeedDocument extends Command {
     }
 
     public function pack($data = ""): string {
-        return parent::pack(pack("CC", $this->flags, $this->lines));
+        return parent::pack(
+                        pack("CC",
+                                $this->flags,
+                                $this->lines
+                        )
+        );
     }
 
 }
