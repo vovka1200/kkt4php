@@ -292,7 +292,7 @@ class KKT {
         if (class_exists($command_class)) {
             $command = new $command_class(...$arguments);
             $this->send($command);
-            return $command->get();
+            return $command->getData();
         }
     }
 
