@@ -680,8 +680,9 @@ class PrintStringWithFont extends Command {
  */
 class GetShortECRStatus extends Command {
 
-    static $CODE              = 0x10;
-    static public $MODE       = [
+    static $CODE = 0x10;
+
+    const MODE       = [
         1 => "Выдача данных",
         2 => "Открытая смена, 24 часа не кончились",
         3 => "Открытая смена, 24 часа кончились",
@@ -695,7 +696,7 @@ class GetShortECRStatus extends Command {
         0b01001000 => "Возврат расхода",
         0b10001000 => "Нефискальный",
     ];
-    static public $SUBMODE    = [
+    const SUBMODE    = [
         0 => "Бумага есть",
         1 => "Пассивное отсутствие бумаги",
         2 => "Активное отсутствие бумаги",
@@ -703,13 +704,13 @@ class GetShortECRStatus extends Command {
         4 => "Фаза печати операции полных фискальных отчетов",
         5 => "Фаза печати операции"
     ];
-    static public $LAST_PRINT = [
+    const LAST_PRINT = [
         0 => "Печать завершена успешно",
         1 => "Произошел обрыв бумаги",
         2 => "Ошибка принтера",
         5 => "Идет печать"
     ];
-    static public $FLAGS      = [
+    const FLAGS      = [
         0b0000000000000001 => "Рулон операционного журнала",
         0b0000000000000010 => "Рулон чековой ленты",
         0b0000000000000100 => "Верхний датчик подкладного документа",
@@ -733,7 +734,7 @@ class GetShortECRStatus extends Command {
      */
     static public function flags($data) {
         $f = [];
-        foreach (self::$FLAGS as $b => $title) {
+        foreach (self::FLAGS as $b => $title) {
             if ($data & $b) {
                 $f[] = $title;
             }
@@ -756,12 +757,12 @@ class GetShortECRStatus extends Command {
         KKT::debug($data);
         $this->data = array_merge($this->data, [
             "Флаги" => GetShortECRStatus::flags($data["flags"]),
-            "Режим" => self::$MODE[$data["mode"]],
-            "Подрежим" => self::$SUBMODE[$data["submode"]],
+            "Режим" => self::MODE[$data["mode"]],
+            "Подрежим" => self::SUBMODE[$data["submode"]],
             "Количество операций в чеке" => 256 * $data["check1"] + $data["check2"],
             "Напряжение резервной батареи" => round($data["V1"] / 51, 2),
             "Напряжение источника питания" => round($data["V2"] / 9, 2),
-            "Результат последней печати" => self::$LAST_PRINT[$data["result"]]
+            "Результат последней печати" => self::LAST_PRINT[$data["result"]]
         ]);
     }
 
