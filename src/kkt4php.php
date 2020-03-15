@@ -512,6 +512,15 @@ abstract class Command {
 }
 
 /**
+ * ПродолжитьПечать
+ */
+class ContinuePrint extends Command {
+
+    static $CODE = 0xB0;
+
+}
+
+/**
  * ПечатьКартинки
  */
 class Draw extends Command {
