@@ -765,13 +765,13 @@ class GetShortECRStatus extends Command {
         }
         KKT::debug($data);
         $this->data = array_merge($this->data, [
-            "Флаги" => GetShortECRStatus::flags($data["flags"]),
-            "Режим" => self::MODE[$data["mode"]],
+            "Флаги" => [$data["flags"] => GetShortECRStatus::flags($data["flags"])],
+            "Режим" => [$data["mode"] => self::MODE[$data["mode"]]],
             "Подрежим" => [$data["submode"] => self::SUBMODE[$data["submode"]]],
             "Количество операций в чеке" => 256 * $data["check1"] + $data["check2"],
             "Напряжение резервной батареи" => round($data["V1"] / 51, 2),
             "Напряжение источника питания" => round($data["V2"] / 9, 2),
-            "Результат последней печати" => self::LAST_PRINT[$data["result"]]
+            "Результат последней печати" => [$data["result"] => self::LAST_PRINT[$data["result"]]]
         ]);
     }
 
@@ -1063,13 +1063,13 @@ class GetDeviceMetrics extends Command {
         $data       = unpack("C/Cerror/Ctype/Csubtype/Cversion/Crevision/Cmodel/Clanguage/A*text", $buf);
         $this->data = [
             "Код ошибки" => $data["error"],
-            "Ошибка" => KKT::ERRORS[$data["error"]],
-            "Тип устройства" => self::$TYPES [$data["type"]],
+            "Ошибка" => [$data["error"] => KKT::ERRORS[$data["error"]]],
+            "Тип устройства" => [$data["type"] => self::$TYPES [$data["type"]]],
             "Подтип устройства" => $data["subtype"],
             "Версия протокола" => $data["version"],
             "Подверсия протокола" => $data["revision"],
             "Модель устройства" => $data["model"],
-            "Язык устройства" => self::$LANGUAGES[$data["language"]],
+            "Язык устройства" => [$data["language"] => self::$LANGUAGES[$data["language"]]],
             "Название устройства" => iconv("CP1251", "UTF-8", $data["text"])
         ];
     }
