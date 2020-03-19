@@ -767,7 +767,7 @@ class GetShortECRStatus extends Command {
         $this->data = array_merge($this->data, [
             "Флаги" => GetShortECRStatus::flags($data["flags"]),
             "Режим" => self::MODE[$data["mode"]],
-            "Подрежим" => self::SUBMODE[$data["submode"]],
+            "Подрежим" => [$data["submode"] => self::SUBMODE[$data["submode"]]],
             "Количество операций в чеке" => 256 * $data["check1"] + $data["check2"],
             "Напряжение резервной батареи" => round($data["V1"] / 51, 2),
             "Напряжение источника питания" => round($data["V2"] / 9, 2),
@@ -783,6 +783,9 @@ class GetShortECRStatus extends Command {
 class Sale extends Command {
 
     static $CODE = 0x80;
+
+    const MAX_STRING = 40;
+
     protected $quantity;
     protected $price;
     protected $department;
@@ -832,7 +835,7 @@ class Sale extends Command {
                                 $this->tax2,
                                 $this->tax3,
                                 $this->tax4,
-                                str_pad($this->text, max(strlen($this->text), 40), "\0")
+                                str_pad(KKT::text($this->text), self::MAX_STRING, "\0")
                         )
         );
     }
@@ -845,6 +848,9 @@ class Sale extends Command {
 class CloseCheck extends Command {
 
     static $CODE = 0x85;
+
+    const MAX_STRING = 40;
+
     protected $summ1;
     protected $summ2;
     protected $summ3;
@@ -901,7 +907,7 @@ class CloseCheck extends Command {
                                 $this->tax2,
                                 $this->tax3,
                                 $this->tax4,
-                                str_pad($this->text, max(strlen($this->text), 40), "\0")
+                                str_pad(KKT::text($this->text), self::MAX_STRING, "\0")
                         )
         );
     }
