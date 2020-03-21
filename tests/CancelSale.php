@@ -17,14 +17,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-require_once realpath(__DIR__ . "/../") . '/src/kkt4php.php';
 require_once 'config.php';
 
 use kkt4php\KKT;
 
-KKT::$DEBUG = true;
-
-$t        = new KKT(HOST, PORT, PASSWORD);
+$t        = new KKT(HOST, PORT, 30);
 $response = $t->CancelCheck();
 var_export($response);
 
