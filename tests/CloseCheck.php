@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Copyright (C) 2019 Vladimir Yavorskiy <vovka@krevedko.su>
+ * Copyright (C) 2020 vovka
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,11 +17,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
 require_once 'config.php';
 
 use kkt4php\KKT;
 
 $t        = new KKT(HOST, PORT, 30);
-$response = $t->CancelCheck();
+$response = $t->CloseCheck(1, 0, 0, 0, 0, 0, 0, 0, 0, "test Close");
 var_export($response);
 

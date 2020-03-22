@@ -80,7 +80,9 @@ class KKT {
         60 => "Смена открыта – операция невозможна",
         61 => "Смена не открыта – операция невозможна",
         64 => "Переполнение диапазона скидок",
+        74 => "Открыт чек – операция невозможна",
         80 => "Идет печать результатов выполнения предыдущей команды",
+        88 => "Ожидание команды продолжения печати",
         89 => "Документ открыт другим кассиром",
         94 => "Неверная операция",
         99 => "Переполнение диапазона отдела",
@@ -292,7 +294,7 @@ class KKT {
         if (class_exists($command_class)) {
             $command = new $command_class(...$arguments);
             $this->send($command);
-            return $command->get();
+            return $command->getData();
         }
     }
 
@@ -512,6 +514,50 @@ abstract class Command {
 }
 
 /**
+ * ПродолжитьПечать
+ */
+class ContinuePrint extends Command {
+
+    static $CODE = 0xB0;
+
+}
+
+/**
+ * ПечатьКартинки
+ */
+class Draw extends Command {
+
+    static $CODE = 0xC1;
+    protected $first_line;
+    protected $last_line;
+
+    /**
+     * Команда печатает графику
+     * @param int $first_line
+     * @param int $last_line
+     */
+    function __construct(int $first_line, int$last_line, int $password = null) {
+        parent::__construct($password);
+        $this->first_line = $first_line;
+        $this->last_line  = $last_line;
+    }
+
+    /**
+     * Упаковывает запрос
+     * @param type $data
+     * @return string Бинарная строка
+     */
+    public function pack($data = ""): string {
+        return parent::pack(pack("CC",
+                                $this->first_line,
+                                $this->last_line
+                        )
+        );
+    }
+
+}
+
+/**
  * ЗагрузкаГрафики
  */
 class LoadLineData extends Command {
@@ -645,8 +691,9 @@ class PrintStringWithFont extends Command {
  */
 class GetShortECRStatus extends Command {
 
-    static $CODE              = 0x10;
-    static public $MODE       = [
+    static $CODE = 0x10;
+
+    const MODE       = [
         1 => "Выдача данных",
         2 => "Открытая смена, 24 часа не кончились",
         3 => "Открытая смена, 24 часа кончились",
@@ -660,7 +707,7 @@ class GetShortECRStatus extends Command {
         0b01001000 => "Возврат расхода",
         0b10001000 => "Нефискальный",
     ];
-    static public $SUBMODE    = [
+    const SUBMODE    = [
         0 => "Бумага есть",
         1 => "Пассивное отсутствие бумаги",
         2 => "Активное отсутствие бумаги",
@@ -668,13 +715,13 @@ class GetShortECRStatus extends Command {
         4 => "Фаза печати операции полных фискальных отчетов",
         5 => "Фаза печати операции"
     ];
-    static public $LAST_PRINT = [
+    const LAST_PRINT = [
         0 => "Печать завершена успешно",
         1 => "Произошел обрыв бумаги",
         2 => "Ошибка принтера",
         5 => "Идет печать"
     ];
-    static public $FLAGS      = [
+    const FLAGS      = [
         0b0000000000000001 => "Рулон операционного журнала",
         0b0000000000000010 => "Рулон чековой ленты",
         0b0000000000000100 => "Верхний датчик подкладного документа",
@@ -698,7 +745,7 @@ class GetShortECRStatus extends Command {
      */
     static public function flags($data) {
         $f = [];
-        foreach (self::$FLAGS as $b => $title) {
+        foreach (self::FLAGS as $b => $title) {
             if ($data & $b) {
                 $f[] = $title;
             }
@@ -720,13 +767,13 @@ class GetShortECRStatus extends Command {
         }
         KKT::debug($data);
         $this->data = array_merge($this->data, [
-            "Флаги" => GetShortECRStatus::flags($data["flags"]),
-            "Режим" => self::$MODE[$data["mode"]],
-            "Подрежим" => self::$SUBMODE[$data["submode"]],
+            "Флаги" => [$data["flags"] => GetShortECRStatus::flags($data["flags"])],
+            "Режим" => [$data["mode"] => self::MODE[$data["mode"]]],
+            "Подрежим" => [$data["submode"] => self::SUBMODE[$data["submode"]]],
             "Количество операций в чеке" => 256 * $data["check1"] + $data["check2"],
             "Напряжение резервной батареи" => round($data["V1"] / 51, 2),
             "Напряжение источника питания" => round($data["V2"] / 9, 2),
-            "Результат последней печати" => self::$LAST_PRINT[$data["result"]]
+            "Результат последней печати" => [$data["result"] => self::LAST_PRINT[$data["result"]]]
         ]);
     }
 
@@ -738,6 +785,9 @@ class GetShortECRStatus extends Command {
 class Sale extends Command {
 
     static $CODE = 0x80;
+
+    const MAX_STRING = 40;
+
     protected $quantity;
     protected $price;
     protected $department;
@@ -787,7 +837,7 @@ class Sale extends Command {
                                 $this->tax2,
                                 $this->tax3,
                                 $this->tax4,
-                                str_pad($this->text, max(strlen($this->text), 40), "\0")
+                                str_pad(KKT::text($this->text), self::MAX_STRING, "\0")
                         )
         );
     }
@@ -800,6 +850,9 @@ class Sale extends Command {
 class CloseCheck extends Command {
 
     static $CODE = 0x85;
+
+    const MAX_STRING = 40;
+
     protected $summ1;
     protected $summ2;
     protected $summ3;
@@ -856,7 +909,7 @@ class CloseCheck extends Command {
                                 $this->tax2,
                                 $this->tax3,
                                 $this->tax4,
-                                str_pad($this->text, max(strlen($this->text), 40), "\0")
+                                str_pad(KKT::text($this->text), self::MAX_STRING, "\0")
                         )
         );
     }
@@ -885,12 +938,14 @@ class CancelCheck extends Command {
 
 class CutCheck extends Command {
 
-    static $CODE      = 0x25;
-    static $TYPE_FULL = 0;
-    static $TYPE_PART = 1;
+    static $CODE = 0x25;
+
+    const TYPE_FULL = 0;
+    const TYPE_PART = 1;
+
     protected $type;
 
-    function __construct($type = 0, int $password = null) {
+    function __construct($type = self::TYPE_FULL, int $password = null) {
         parent::__construct($password);
         $this->type = $type;
     }
@@ -941,7 +996,12 @@ class FeedDocument extends Command {
     }
 
     public function pack($data = ""): string {
-        return parent::pack(pack("CC", $this->flags, $this->lines));
+        return parent::pack(
+                        pack("CC",
+                                $this->flags,
+                                $this->lines
+                        )
+        );
     }
 
 }
@@ -1005,13 +1065,13 @@ class GetDeviceMetrics extends Command {
         $data       = unpack("C/Cerror/Ctype/Csubtype/Cversion/Crevision/Cmodel/Clanguage/A*text", $buf);
         $this->data = [
             "Код ошибки" => $data["error"],
-            "Ошибка" => KKT::ERRORS[$data["error"]],
-            "Тип устройства" => self::$TYPES [$data["type"]],
+            "Ошибка" => [$data["error"] => KKT::ERRORS[$data["error"]]],
+            "Тип устройства" => [$data["type"] => self::$TYPES [$data["type"]]],
             "Подтип устройства" => $data["subtype"],
             "Версия протокола" => $data["version"],
             "Подверсия протокола" => $data["revision"],
             "Модель устройства" => $data["model"],
-            "Язык устройства" => self::$LANGUAGES[$data["language"]],
+            "Язык устройства" => [$data["language"] => self::$LANGUAGES[$data["language"]]],
             "Название устройства" => iconv("CP1251", "UTF-8", $data["text"])
         ];
     }
