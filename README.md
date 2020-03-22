@@ -7,22 +7,27 @@ PHP драйвер для ККТ Штрих-М
 
 ### Реализованные методы драйвера
 
+Общие
 - GetDeviceMetrics
 - GetShortECRStatus
 - GetOperationReg
 
+Операции
 - OpenCheck
 - CloseCheck
 - CancelCheck
 - CutCheck
 - Sale
 - PrintReportWithCleaning
-- PrintStringWithFont
 
+Печать
+- PrintStringWithFont
 - FeedDocument
 
+Разные
 - Beep
 
+Графика
 - LoadLineData
 - LoadImage
 - Draw
