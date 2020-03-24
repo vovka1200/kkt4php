@@ -1087,6 +1087,15 @@ class PrintReportWithCleaning extends Command {
 
 }
 
+/**
+ * Печатает сменный отчет без гашения
+ */
+class PrintReportWithoutCleaning extends Command {
+
+    static $CODE = 0x40;
+
+}
+
 namespace kkt4php\errors;
 
 class KKTError extends \Error {
