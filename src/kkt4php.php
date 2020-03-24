@@ -28,8 +28,10 @@ class KKT {
 
     const VERSION = "0.1.0";
 
-    static $DEBUG        = false;
-    static $TIMEOUT_BYTE = 3000; // ms
+    static $DEBUG           = false;
+    static $TIMEOUT_BYTE    = 3000; // ms
+    static $WAITPRINT_RETRY = 50;
+    static $WAITPRINT_PAUSE = 0.5;
 
     const STX = 0x02;
     const ENQ = 0x05;
@@ -97,7 +99,7 @@ class KKT {
     static public function debug($data) {
         if (KKT::$DEBUG) {
             $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-            echo "{$trace[1]["class"]}->{$trace[1]["function"]}: " . ( is_string($data) ? $data : var_export($data, true)) . "\n";
+            error_log("{$trace[1]["class"]}->{$trace[1]["function"]}: " . ( is_string($data) ? $data : var_export($data, true)) . "\n");
         }
     }
 
@@ -324,6 +326,24 @@ class KKT {
         for ($y = 0; $y < $im->getHeight(); $y++) {
             $this->LoadLineData($y, $im->getLineData($y));
         }
+    }
+
+    /**
+     * Ожидание завершения печати
+     */
+    function waitPrint() {
+        $status = $this->GetShortECRStatus();
+        $n      = self::$WAITPRINT_RETRY;
+        while (!key_exists(0, $status["Подрежим"]) && $n--) {
+            $this->debug("Идёт печать");
+            if (key_exists(3, $status["Подрежим"])) {
+                $this->debug("Продолжить печать");
+                $this->kkt->ContinuePrint();
+            }
+            sleep(self::$WAITPRINT_PAUSE);
+            $status = $this->GetShortECRStatus();
+        }
+        $this->debug($status);
     }
 
 }
