@@ -31,7 +31,7 @@ class KKT {
     static $DEBUG           = false;
     static $TIMEOUT_BYTE    = 3000; // ms
     static $WAITPRINT_RETRY = 50;
-    static $WAITPRINT_PAUSE = 0.5;
+    static $WAITPRINT_PAUSE = 500; // ms
 
     const STX = 0x02;
     const ENQ = 0x05;
@@ -340,7 +340,7 @@ class KKT {
                 $this->debug("Продолжить печать");
                 $this->kkt->ContinuePrint();
             }
-            sleep(self::$WAITPRINT_PAUSE);
+            usleep(self::$WAITPRINT_PAUSE);
             $status = $this->GetShortECRStatus();
         }
         $this->debug($status);
