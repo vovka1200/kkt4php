@@ -340,7 +340,7 @@ class KKT {
                 $this->debug("Продолжить печать");
                 $this->kkt->ContinuePrint();
             }
-            usleep(self::$WAITPRINT_PAUSE);
+            usleep(self::$WAITPRINT_PAUSE * 1000);
             $status = $this->GetShortECRStatus();
         }
         $this->debug($status);
